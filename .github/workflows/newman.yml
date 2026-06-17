@@ -25,33 +25,39 @@ jobs:
       - name: Lint OpenAPI contracts
         run: npm run lint:contracts
 
-      - name: Start Prism servers
+      - name: Start Prism mock servers
         run: |
           nohup npm run mock:iot > prism-iot.log 2>&1 &
           nohup npm run mock:vision > prism-vision.log 2>&1 &
-          sleep 15
+          sleep 20
 
-      - name: Check server status
+      - name: Verify servers started
         run: |
-          curl http://localhost:4010/health
-          curl http://localhost:4011/health
+          cat prism-iot.log || true
+          cat prism-vision.log || true
 
-      - name: Wait for servers
+          curl --retry 20 --retry-delay 3 http://127.0.0.1:4010/health
+          curl --retry 20 --retry-delay 3 http://127.0.0.1:4011/health
+
+      - name: Wait for ports
         run: |
           npx wait-on tcp:4010 tcp:4011 --timeout 180000
 
       - name: Run Newman tests
         run: npm run test:mock
 
-      - name: Show logs if failed
+      - name: Show logs on failure
         if: failure()
         run: |
+          echo "=== IOT LOG ==="
           cat prism-iot.log || true
+
+          echo "=== VISION LOG ==="
           cat prism-vision.log || true
 
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: reports
+          name: newman-reports
           path: reports/
