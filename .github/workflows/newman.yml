@@ -2,62 +2,56 @@ name: Newman Contract Tests
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
   pull_request:
-    branches: ["main"]
+    branches:
+      - main
 
 jobs:
   newman:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: 22
 
       - name: Install dependencies
         run: npm install
 
-      - name: Lint OpenAPI contracts
+      - name: Lint contracts
         run: npm run lint:contracts
 
-      - name: Start Prism mock servers
+      - name: Start mock servers
         run: |
           nohup npm run mock:iot > prism-iot.log 2>&1 &
           nohup npm run mock:vision > prism-vision.log 2>&1 &
           sleep 20
 
-      - name: Verify servers started
+      - name: Verify servers
         run: |
-          cat prism-iot.log || true
-          cat prism-vision.log || true
+          curl --fail http://127.0.0.1:4010/health
+          curl --fail http://127.0.0.1:4011/health
 
-          curl --retry 20 --retry-delay 3 http://127.0.0.1:4010/health
-          curl --retry 20 --retry-delay 3 http://127.0.0.1:4011/health
-
-      - name: Wait for ports
-        run: |
-          npx wait-on tcp:4010 tcp:4011 --timeout 180000
-
-      - name: Run Newman tests
+      - name: Run Newman
         run: npm run test:mock
 
-      - name: Show logs on failure
+      - name: Show logs
         if: failure()
         run: |
-          echo "=== IOT LOG ==="
+          echo "=== IOT ==="
           cat prism-iot.log || true
-
-          echo "=== VISION LOG ==="
+          echo "=== VISION ==="
           cat prism-vision.log || true
 
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: newman-reports
+          name: reports
           path: reports/
